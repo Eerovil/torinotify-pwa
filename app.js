@@ -11,7 +11,7 @@ let users;
 try {
   users = await db.getData("/users");
 } catch (error) {
-  db.push("/users", {username: "admin"});
+  db.push("/users[]", {username: "admin"});
   users = await db.getData("/users");
 }
 // initialize the db subscriptions to empty array if missing
