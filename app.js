@@ -87,6 +87,7 @@ async function pushNotification(payload) {
     } catch (err) {
       console.log(sub.endpoint, '->', err.message);
       // TODO: Delete subscription (e.g. from db)
+      console.log(err)
     }
   }));
 }
