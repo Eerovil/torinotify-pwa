@@ -1,6 +1,32 @@
 
-window.addEventListener('load', () => {
-  initServiceWorker();
+let username = window.localStorage.getItem('username');
+let password = window.localStorage.getItem('password');
+
+async function initLogin() {
+  if (!username) {
+    username = prompt('Username');
+    password = prompt('Password');
+  }
+  const resp = await fetch('/subscribe', {
+    method: 'post',
+    body: JSON.stringify({ username, password }),
+    headers: { 'content-type': 'application/json' }
+  });
+  if (resp.status === 200) {
+    window.localStorage.setItem('username', username);
+    window.localStorage.setItem('password', password);
+  } else {
+    alert('Invalid username or password');
+    window.localStorage.removeItem('username');
+    window.localStorage.removeItem('password');
+    window.location.reload();
+  }
+}
+
+
+window.addEventListener('load', async () => {
+  await initLogin();
+  await initServiceWorker();
   updatePrompt();
 });
 
@@ -24,7 +50,7 @@ function onPromptClick() {
       updatePrompt();
       if (permission === 'granted') {
         console.log('Notification permission granted.');
-        init();
+        initServiceWorker();
       } else if (permission === 'denied') {
         console.warn('Notification permission denied.');
       }
@@ -40,7 +66,9 @@ const vapidPublicKey = VAPID_PUBLIC_KEY;
 
 async function initServiceWorker() {
   if ('serviceWorker' in navigator) {
-    const swRegistration = await navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js');
+    console.log('Initializing service worker');
+    const swRegistration = await navigator.serviceWorker.ready;
     const subscription = await swRegistration.pushManager.getSubscription();
     if (subscription) {
       console.log('User is already subscribed:', subscription);
@@ -56,12 +84,14 @@ async function initServiceWorker() {
   } else {
     console.warn('Service worker is not supported');
   }
+  console.log('Service worker initialized');
 }
 
 function sendSubscriptionToServer(subscription) {
+  console.log('Sending subscription to server:', subscription);
   fetch('/subscribe', {
     method: 'post',
-    body: JSON.stringify(subscription),
+    body: JSON.stringify({username, password, ...JSON.parse(JSON.stringify(subscription))}),
     headers: { 'content-type': 'application/json' }
   });
 }
