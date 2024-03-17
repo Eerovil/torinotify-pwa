@@ -6,7 +6,7 @@
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data.text(),
-    icon: '/apple-touch-icon.png',
+    icon: '/favicon-192x192.png',
     badge: '/badge.png',
   };
   event.waitUntil(self.registration.showNotification('My App', options));
@@ -16,7 +16,7 @@ self.addEventListener('push', (event) => {
 // Clickable Notifications
 //------------------------------------------------------------------------
 
-const targetUrl = 'http://localhost:3000';
+const targetUrl = 'https://torinotify.duckdns.org';
 
 self.addEventListener('notificationclick', (event) => {
   self.console.log('notificationclick');
