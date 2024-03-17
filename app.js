@@ -5,6 +5,8 @@ import path from 'path';
 import webPush from 'web-push';
 import secrets from './secrets.js';
 import { JsonDB, Config } from 'node-json-db';
+import { parse } from 'node-html-parser';
+import axios from 'axios';
 
 var db = new JsonDB(new Config("db", true, true, '/'));
 let users;
@@ -144,6 +146,21 @@ app.delete('/api/watchers/:id', async (req, res) => {
   res.status(200).end();
 });
 
+app.get('/api/watchers/:id', async (req, res) => {
+  if (!login(req.headers.authorization)) {
+    return res.status(401).end();
+  }
+  const id = req.params.id;
+  const watcher = await db.getData(`/watchers/${id}`);
+  if (watcher.username != req.headers.authorization.split(':')[0]) {
+    return res.status(401).end();
+  }
+  const updatedWatcher = await updateWatcher(watcher);
+  await db.push(`/watchers/${id}`, updatedWatcher);
+  res.json(watcher);
+  res.status(200).end();
+});
+
 async function pushNotification(payload) {
   const subscriptions = await db.getData("/subscriptions");
   console.log("subscriptions", subscriptions)
@@ -157,6 +174,79 @@ async function pushNotification(payload) {
       console.log(err)
     }
   }));
+}
+
+function parsePrice(priceText) {
+  // Convert 1 500 € -> 1500
+  // 180 € -> 180
+  // 1 500 000 € -> 1500000
+  return parseInt(priceText.replace(/ /g, '').replace('€', ''));
+}
+
+function parseRow(rowElement, beta = false) {
+  const ret = {
+    url: rowElement.getAttribute('href'),
+  };
+  // Id is in URL: "xxxxxx.htm" where xxxxxx is the id in digits
+  const id = ret.url.match(/(\d+).htm/)[1];
+  Object.assign(ret, {id});
+  if (beta) {
+    console.log('Parsing beta row:', rowElement.structure);
+    Object.assign(ret, {
+      thumbnail: rowElement.querySelector('img').getAttribute('src'),
+      title: rowElement.querySelector('.li-title').text,
+      price: parsePrice(rowElement.querySelector('.list_price').text),
+    });
+    return ret;
+  }
+  Object.assign(ret, {
+    thumbnail: rowElement.querySelector('img.thumb').getAttribute('src'),
+    title: rowElement.querySelector('.listing-row-title').text,
+    price: parsePrice(rowElement.querySelector('.row-price').text),
+  });
+  return ret;
+}
+
+
+async function updateWatcher(watcher) {
+  const url = watcher.url;
+  // const response = await fetch(url);
+  // Fetch with utf-8 encoding
+  console.log('Fetching:', url);
+  const response = await axios.get(url, {
+    responseEncoding: "latin1",
+    headers: {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Cache-Control': 'max-age=0',
+      'Connection': 'keep-alive',
+      'Host': 'www.tori.fi',
+      'Upgrade-Insecure-Requests': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+    }
+  });
+  const html = await response.data;
+  const root = parse(html);
+  let newRows = root.querySelectorAll('.row-href');
+  let beta = false;
+  if (newRows.length == 0) {
+    console.log('No rows found');
+    beta = true;
+    newRows = root.querySelectorAll('.item_row_flex');
+  }
+  console.log('New rows:', newRows);
+  watcher.rows = watcher.rows || {};
+  for (const row of newRows) {
+    try {
+      const {id, url, thumbnail, title, price} = parseRow(row, beta);
+      console.log(title, price);
+      watcher.rows[url] = {id, url, thumbnail, title, price};
+    } catch (error) {
+      console.log('Error parsing row:', error);
+    }
+  }
+  return watcher;
 }
 
 // Send test notification every 10 seconds

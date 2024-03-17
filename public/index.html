@@ -57,6 +57,9 @@
                   <v-card-title>
                     <h3>{{ selectedWatcher.name || 'Tyhjä hakuvahti' }}</h3>
                     <v-spacer></v-spacer>
+                    <v-btn icon @click="updateWatcher">
+                      <v-icon>mdi-refresh</v-icon>
+                    </v-btn>
                     <v-btn icon @click="editingWatcher = true">
                       <v-icon>mdi-pencil</v-icon>
                     </v-btn>
@@ -66,14 +69,27 @@
                   </v-card-text>
                 </v-card>
               </v-col>
-            <v-row v-for="item in selectedWatcher.items" :key="item.id">
+            </v-row>
+            <v-row v-for="item in selectedWatcher.rows" :key="item.id">
               <v-col cols="12">
                 <v-card>
                   <v-card-title>
-                    <h2>{{ item.name }}</h2>
+                    <h3>{{ item.title }}</h3>
                   </v-card-title>
                   <v-card-text>
-                    <p>{{ item.url }}</p>
+                    <v-row>
+                      <v-col cols="3">
+                        <p>{{ item.price }} e</p>
+                      </v-col>
+                    </v-row>
+                    <v-row>
+                      <v-col cols="3" style="padding: 0;">
+                        <img :src="item.thumbnail" style="max-width: 100%">
+                      </v-col>
+                      <v-col cols="9">
+                      <p>{{ item.url }}</p>
+                      </v-col>
+                    </v-row>
                   </v-card-text>
                 </v-card>
               </v-col>
@@ -178,6 +194,11 @@
             this.$delete(this.watchers, this.selectedWatcherID);
             this.selectedWatcherID = null;
           },
+          async updateWatcher() {
+            if (!this.selectedWatcher) return;
+            const response = await this.authGet('/api/watchers/' + this.selectedWatcher.id);
+            this.$set(this.watchers, this.selectedWatcherID, response.data);
+          }
         }
       });
     </script>
