@@ -22,7 +22,6 @@ async function initLogin() {
     alert('Invalid username or password');
     window.localStorage.removeItem('username');
     window.localStorage.removeItem('password');
-    window.location.reload();
   }
 }
 
