@@ -333,6 +333,8 @@ async function updateAllWatchers() {
   }
 }
 
+setInterval(updateAllWatchers, 60 * 1000);
+
 // Send test notification every 10 seconds
 // setInterval(() => {
 //   pushNotification('This is a test notification!');
