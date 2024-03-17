@@ -9,8 +9,11 @@ async function initLogin() {
   }
   const resp = await fetch('/subscribe', {
     method: 'post',
-    body: JSON.stringify({ username, password }),
-    headers: { 'content-type': 'application/json' }
+    body: JSON.stringify({}),
+    headers: {
+      'content-type': 'application/json',
+      'authorization': username + ':' + password,
+    }
   });
   if (resp.status === 200) {
     window.localStorage.setItem('username', username);
@@ -91,7 +94,10 @@ function sendSubscriptionToServer(subscription) {
   console.log('Sending subscription to server:', subscription);
   fetch('/subscribe', {
     method: 'post',
-    body: JSON.stringify({username, password, ...JSON.parse(JSON.stringify(subscription))}),
-    headers: { 'content-type': 'application/json' }
+    body: JSON.stringify({subscription}),
+    headers: {
+      'content-type': 'application/json',
+      'authorization': username + ':' + password,
+    }
   });
 }

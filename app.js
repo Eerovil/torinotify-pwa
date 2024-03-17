@@ -26,7 +26,6 @@ const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 app.set('views', path.resolve('views'));
-app.set('view engine', 'pug');
 app.use(morgan('dev'));
 app.use(express.static('public'));
 
@@ -39,13 +38,11 @@ webPush.setVapidDetails(
   vapid.privateKey
 );
 
-app.get('/', (req, res) => {
-  res.render('index', { vapidPublicKey: vapid.publicKey });
-});
-
-function login(body) {
-  const username = body.username;
-  const password = body.password;
+function login(authorization) {
+  const split = authorization.split(':');
+  if (split.length !== 2) return false;
+  const username = split[0];
+  const password = split[1];
   console.log('Login attempt:', username, password);
   if (password != secrets.password) {
     return false;
@@ -53,13 +50,11 @@ function login(body) {
   if (!users.find((u) => u.username === username)) {
     return false;
   }
-  delete body.username;
-  delete body.password;
   return true;
 }
 
 app.post('/subscribe', async (req, res) => {
-  if (!login(req.body)) {
+  if (!login(req.headers.authorization)) {
     return res.status(401).end();
   }
   const sub = req.body;
@@ -93,9 +88,9 @@ async function pushNotification(payload) {
 }
 
 // Send test notification every 10 seconds
-setInterval(() => {
-  pushNotification('This is a test notification!');
-}, 10 * 1000);
+// setInterval(() => {
+//   pushNotification('This is a test notification!');
+// }, 10 * 1000);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

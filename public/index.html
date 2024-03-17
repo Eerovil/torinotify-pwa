@@ -1,0 +1,86 @@
+
+<html>
+  <head>
+    <title>ToriNotify</title>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon-192x192.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="/manifest.json">
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/MaterialDesign-Webfont/5.3.45/css/materialdesignicons.min.css">
+    <!-- Vuetify -->
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lodash@4.17.14/lodash.min.js"></script>
+    <script src="https://unpkg.com/axios@1.0.0/dist/axios.min.js"></script>
+
+    <script>
+      const VAPID_PUBLIC_KEY = '';
+    </script>
+    <script src="/client.js"></script>
+  </head>
+  <body>
+    <a href="#" id="promptLink" onclick="onPromptClick()">Enable notifications</a>
+    <div id="app"></div>
+    <template id="vue-app">
+      <v-app data-app>
+        <v-main>
+          <v-toolbar dark color="primary" fixed>
+            <h1>ToriNotify</h1>
+            <v-spacer></v-spacer>
+            <v-btn icon>
+              <v-icon>mdi-menu</v-icon>
+            </v-btn>
+          </v-toolbar>
+          <v-container>
+            <v-row>
+            </v-row>
+          </v-container>
+        </v-main>
+      </v-app>
+    </template>
+    <script>
+      new Vue({
+        el: '#app',
+        template: '#vue-app',
+        vuetify: new Vuetify(),
+
+        data: () => ({
+          subscription: null,
+
+          watchers: {},
+        }),
+
+        methods: {
+          getAuthorization() {
+            return window.localStorage.getItem('username') + ":" + window.localStorage.getItem('password');
+          },
+          authAxios(method, url, data, headers = {}) {
+            return axios.create({
+              headers: {
+                'Authorization': this.getAuthorization(),
+                ...headers,
+              }
+            })[method](url, data);
+          },
+          authGet(url, headers = {}) {
+            return this.authAxios('get', url, {}, headers);
+          },
+          authPost(url, data, headers = {}) {
+            return this.authAxios('post', url, data, headers);
+          },
+          authDelete(url, headers = {}) {
+            return this.authAxios('delete', url, {}, headers);
+          },
+          authPatch(url, data, headers = {}) {
+            return this.authAxios('patch', url, data, headers);
+          },
+          async getWatchers() {
+            return this.authGet('/api/watchers');
+          },
+        }
+      });
+    </script>
+  </body>
+</html>
