@@ -251,7 +251,7 @@
             const response = await this.authPost('/api/watchers', {
               username: window.localStorage.getItem('username'),
             });
-            this.watchers.push(response.data);
+            this.$set(this.watchers, response.data.id, response.data);
             this.updateMark();
           },
           async saveWatcher() {

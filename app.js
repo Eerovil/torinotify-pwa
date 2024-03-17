@@ -97,7 +97,7 @@ app.post('/api/watchers', async (req, res) => {
   }
   // Find max id and increment
   const newId = await getNewId('/watchers');
-  await db.push(`/watchers/${newId}`, {id: newId, ...req.body});
+  await db.push(`/watchers/${newId}`, {id: newId, rows: {}, ...req.body});
   // Return the new watcher
   res.json(await db.getData(`/watchers/${newId}`));
   res.status(200).end();
