@@ -1,6 +1,7 @@
 
 let username = window.localStorage.getItem('username');
 let password = window.localStorage.getItem('password');
+let vapidPublicKey = window.localStorage.getItem('vapidPublicKey');
 
 async function initLogin() {
   if (!username) {
@@ -16,6 +17,8 @@ async function initLogin() {
     }
   });
   if (resp.status === 200) {
+    vapidPublicKey = (await resp.json()).vapidPublicKey;
+    console.log(vapidPublicKey)
     window.localStorage.setItem('username', username);
     window.localStorage.setItem('password', password);
   } else {
@@ -63,8 +66,6 @@ function onPromptClick() {
 //------------------------------------------------------------------------
 // Init Service Worker
 //------------------------------------------------------------------------
-
-const vapidPublicKey = VAPID_PUBLIC_KEY;
 
 async function initServiceWorker() {
   if ('serviceWorker' in navigator) {

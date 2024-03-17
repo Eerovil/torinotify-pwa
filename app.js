@@ -67,6 +67,7 @@ app.post('/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub.endpoint) {
     console.log('Invalid subscription:', sub);
+    res.json({vapidPublicKey: vapid.publicKey});
     return res.status(200).end();
   }
   sub.username = req.headers.authorization.split(':')[0];
