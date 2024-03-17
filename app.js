@@ -280,12 +280,13 @@ async function updateWatcher(watcher) {
   const mustMatch = watcher.mustMatch || null;
   const mustNotMatch = watcher.mustNotMatch || null;
   watcher.rows = watcher.rows || {};
+  const rowsEmpty = Object.keys(watcher.rows).length == 0;
   for (const row of newRows) {
     try {
       let match = true;
       const {id, url, thumbnail, title, price} = parseRow(row, beta);
       const oldData = watcher.rows[id] || {};
-      const isNew = !oldData.url;
+      const isNew = !rowsEmpty && !oldData.url;
       if (price < minPrice || price > maxPrice) {
         match = false;
       }
