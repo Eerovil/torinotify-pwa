@@ -19,6 +19,17 @@
       const VAPID_PUBLIC_KEY = '';
     </script>
     <script src="/client.js"></script>
+    <style>
+      .item-match {
+        background-color: #bdffae;
+      }
+      .item-not-match {
+        background-color: #ffaeae;
+        max-height: 150px;
+        overflow: hidden;
+        opacity: 0.2;
+      }
+    </style>
   </head>
   <body>
     <a href="#" id="promptLink" onclick="onPromptClick()">Enable notifications</a>
@@ -70,16 +81,19 @@
                 </v-card>
               </v-col>
             </v-row>
-            <v-row v-for="item in selectedWatcher.rows" :key="item.id">
+            <v-row v-for="item in selectedWatcher.rows" :key="item.id" :class="{'item-match': item.match, 'item-not-match': !item.match}">
               <v-col cols="12">
                 <v-card>
                   <v-card-title>
-                    <h3>{{ item.title }}</h3>
+                    <a :href="item.url" target="_blank"><h3>{{ item.title }}</h3></a>
                   </v-card-title>
                   <v-card-text>
                     <v-row>
                       <v-col cols="3">
                         <p>{{ item.price }} e</p>
+                      </v-col>
+                      <v-col cols="9">
+                        <p>{{ item.location }}</p>
                       </v-col>
                     </v-row>
                     <v-row>
@@ -87,7 +101,7 @@
                         <img :src="item.thumbnail" style="max-width: 100%">
                       </v-col>
                       <v-col cols="9">
-                      <p>{{ item.url }}</p>
+                      <p>{{ item.description }}</p>
                       </v-col>
                     </v-row>
                   </v-card-text>
@@ -108,6 +122,10 @@
                   <v-card-text>
                     <v-text-field label="Nimi" v-model="selectedWatcher.name"></v-text-field>
                     <v-text-field label="URL" v-model="selectedWatcher.url"></v-text-field>
+                    <v-text-field type="number" v-model="selectedWatcher.minPrice" label="Minimihinta"></v-text-field>
+                    <v-text-field type="number" v-model="selectedWatcher.maxPrice" label="Maksimihinta"></v-text-field>
+                    <v-textarea v-model="selectedWatcher.mustMatch" label="Pakko sisältää"></v-textarea>
+                    <v-textarea v-model="selectedWatcher.mustNotMatch" label="Ei saa sisältää"></v-textarea>
                   </v-card-text>
                   <v-card-actions>
                     <v-btn @click="editingWatcher = false">Peruuta</v-btn>

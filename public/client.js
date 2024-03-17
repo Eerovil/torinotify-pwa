@@ -4,7 +4,7 @@ let password = window.localStorage.getItem('password');
 
 async function initLogin() {
   if (!username) {
-    username = prompt('Username');
+    username = (prompt('Username') || '').toLowerCase();
     password = prompt('Password');
   }
   const resp = await fetch('/subscribe', {
@@ -94,7 +94,7 @@ function sendSubscriptionToServer(subscription) {
   console.log('Sending subscription to server:', subscription);
   fetch('/subscribe', {
     method: 'post',
-    body: JSON.stringify({subscription}),
+    body: JSON.stringify(subscription),
     headers: {
       'content-type': 'application/json',
       'authorization': username + ':' + password,

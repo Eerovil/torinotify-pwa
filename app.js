@@ -69,6 +69,7 @@ app.post('/subscribe', async (req, res) => {
     console.log('Invalid subscription:', sub);
     return res.status(200).end();
   }
+  sub.username = req.headers.authorization.split(':')[0];
   console.log('New subscription:', sub.endpoint);
   const subscriptions = await db.getData("/subscriptions");
   // If the subscription is already in the db, don't add it again
@@ -161,11 +162,12 @@ app.get('/api/watchers/:id', async (req, res) => {
   res.status(200).end();
 });
 
-async function pushNotification(payload) {
+async function pushNotification(username, payload) {
+
   const subscriptions = await db.getData("/subscriptions");
   console.log("subscriptions", subscriptions)
-  console.log('Sending notification to', subscriptions.length, 'subscribers');
-  await Promise.all(subscriptions.map(async (sub) => {
+  await Promise.all(subscriptions.filter(sub => sub.username == username).map(async (sub) => {
+    console.log('Sending notification to user', sub.username, sub.endpoint);
     try {
       await webPush.sendNotification(sub, payload); // throws if not successful
     } catch (err) {
@@ -183,6 +185,35 @@ function parsePrice(priceText) {
   return parseInt(priceText.replace(/ /g, '').replace('€', ''));
 }
 
+async function parseItem(itemUrl) {
+  // Get description and location
+  const response = await axiosGetPage(itemUrl);
+  const html = await response.data;
+  const root = parse(html);
+  const beta = !root.querySelector('#beta');
+  const ret = {
+    description: root.querySelector('meta[name="description"]').getAttribute('content'),
+    location: '',
+  };
+  if (beta) {
+    const view = root.querySelector('div.nohistory.private');
+    if (view) {
+      // Split by newlines
+      const lines = view.text.split('\n').filter((line) => line.trim() != '');
+      const lastLine = lines[lines.length - 1];
+      ret['location'] = lastLine;
+    }
+    const itemPropDescription = root.querySelector('div[itemprop="description"]');
+    if (itemPropDescription) {
+      ret['description'] = (itemPropDescription.text || '').trim();
+    }
+  } else {
+    const description = root.querySelector('#body');
+    ret['location'] = '';
+  }
+  return ret;
+}
+
 function parseRow(rowElement, beta = false) {
   const ret = {
     url: rowElement.getAttribute('href'),
@@ -191,7 +222,6 @@ function parseRow(rowElement, beta = false) {
   const id = ret.url.match(/(\d+).htm/)[1];
   Object.assign(ret, {id});
   if (beta) {
-    console.log('Parsing beta row:', rowElement.structure);
     Object.assign(ret, {
       thumbnail: rowElement.querySelector('img').getAttribute('src'),
       title: rowElement.querySelector('.li-title').text,
@@ -207,13 +237,8 @@ function parseRow(rowElement, beta = false) {
   return ret;
 }
 
-
-async function updateWatcher(watcher) {
-  const url = watcher.url;
-  // const response = await fetch(url);
-  // Fetch with utf-8 encoding
-  console.log('Fetching:', url);
-  const response = await axios.get(url, {
+async function axiosGetPage(url) {
+  return await axios.get(url, {
     responseEncoding: "latin1",
     headers: {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -226,27 +251,86 @@ async function updateWatcher(watcher) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
     }
   });
+}
+
+async function updateWatcher(watcher) {
+  const url = watcher.url;
+  // const response = await fetch(url);
+  // Fetch with utf-8 encoding
+  if (!url) {
+    return watcher;
+  }
+  console.log('Fetching:', url);
+  const response = await axiosGetPage(url);
   const html = await response.data;
   const root = parse(html);
   let newRows = root.querySelectorAll('.row-href');
   let beta = false;
   if (newRows.length == 0) {
-    console.log('No rows found');
+    console.debug('No rows found using old, using beta mode');
     beta = true;
     newRows = root.querySelectorAll('.item_row_flex');
   }
-  console.log('New rows:', newRows);
+  const minPrice = watcher.minPrice || 0;
+  const maxPrice = watcher.maxPrice || 1000000;
+  const mustMatch = watcher.mustMatch || [];
+  const mustNotMatch = watcher.mustNotMatch || [];
+  const mustMatchProblems = [];
+  const mustNotMatchProblems = [];
   watcher.rows = watcher.rows || {};
   for (const row of newRows) {
     try {
+      let match = true;
       const {id, url, thumbnail, title, price} = parseRow(row, beta);
-      console.log(title, price);
-      watcher.rows[url] = {id, url, thumbnail, title, price};
+      const oldData = watcher.rows[id] || {};
+      const isNew = !oldData.url;
+      if (price < minPrice || price > maxPrice) {
+        match = false;
+      }
+      watcher.rows[id] = {...oldData, id, url, thumbnail, title, price};
+      if (match && !oldData.description) {
+        const {description, location} = await parseItem(url);
+        watcher.rows[id].description = description;
+        watcher.rows[id].location = location;
+      }
+      if (match) {
+        const fullText = `${title} ${watcher.rows[id].description || ''} ${watcher.rows[id].location || ''}`;
+        for (const must of mustMatch) {
+          if (!fullText.match(new RegExp(must, 'i'))) {
+            match = false;
+            mustMatchProblems.push(must);
+          }
+        }
+        for (const mustNot of mustNotMatch) {
+          if (fullText.match(new RegExp(mustNot, 'i'))) {
+            match = false;
+            mustNotMatchProblems.push(mustNot);
+          }
+        }
+        watcher.rows[id].mustMatchProblems = mustMatchProblems;
+        watcher.rows[id].mustNotMatchProblems = mustNotMatchProblems;
+      }
+      watcher.rows[id].match = match;
+      if (isNew && match) {
+        pushNotification(watcher.username, `${title} - ${price}€`);
+      }
     } catch (error) {
       console.log('Error parsing row:', error);
     }
   }
+  console.log('Watcher updated:', watcher.id);
+  db.push(`/watchers/${watcher.id}`, watcher);
   return watcher;
+}
+
+async function updateAllWatchers() {
+  for (const watcher of Object.values(await db.getData("/watchers"))) {
+    try {
+      updateWatcher(watcher);
+    } catch (error) {
+      console.log('Error updating watcher:', error); 
+    }
+  }
 }
 
 // Send test notification every 10 seconds
@@ -261,3 +345,6 @@ app.listen(port, () => {
 process.on('SIGTERM', () => {
   process.exit();
 });
+
+
+updateAllWatchers();
