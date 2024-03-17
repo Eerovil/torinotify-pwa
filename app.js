@@ -261,6 +261,9 @@ async function updateWatcher(watcher) {
   if (!url) {
     return watcher;
   }
+  if (!(url.includes('https://m.tori'))) {
+    return watcher;
+  }
   console.log('Fetching:', url);
   const response = await axiosGetPage(url);
   const html = await response.data;
