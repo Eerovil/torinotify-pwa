@@ -273,10 +273,8 @@ async function updateWatcher(watcher) {
   }
   const minPrice = watcher.minPrice || 0;
   const maxPrice = watcher.maxPrice || 1000000;
-  const mustMatch = watcher.mustMatch || [];
-  const mustNotMatch = watcher.mustNotMatch || [];
-  const mustMatchProblems = [];
-  const mustNotMatchProblems = [];
+  const mustMatch = watcher.mustMatch || null;
+  const mustNotMatch = watcher.mustNotMatch || null;
   watcher.rows = watcher.rows || {};
   for (const row of newRows) {
     try {
@@ -295,29 +293,34 @@ async function updateWatcher(watcher) {
       }
       if (match) {
         const fullText = `${title} ${watcher.rows[id].description || ''} ${watcher.rows[id].location || ''}`;
-        for (const must of mustMatch) {
-          if (!fullText.match(new RegExp(must, 'i'))) {
-            match = false;
-            mustMatchProblems.push(must);
-          }
+        if (mustMatch && !fullText.match(new RegExp(mustMatch, 'i'))) {
+          match = false;
         }
-        for (const mustNot of mustNotMatch) {
-          if (fullText.match(new RegExp(mustNot, 'i'))) {
-            match = false;
-            mustNotMatchProblems.push(mustNot);
-          }
+        if (mustNotMatch && fullText.match(new RegExp(mustNotMatch, 'i'))) {
+          match = false;
         }
-        watcher.rows[id].mustMatchProblems = mustMatchProblems;
-        watcher.rows[id].mustNotMatchProblems = mustNotMatchProblems;
       }
       watcher.rows[id].match = match;
       if (isNew && match) {
         pushNotification(watcher.username, `${title} - ${price}€`);
       }
+      if (!watcher.rows[id].createdAt) {
+        watcher.rows[id].createdAt = new Date().toISOString();
+      }
     } catch (error) {
       console.log('Error parsing row:', error);
     }
   }
+  // Sort rows by id reversed (newest first) NOTE It's an object
+  // Max amount of rows is 100
+  const sortedKeys = Object.keys(watcher.rows).sort((a, b) => parseInt(b) - parseInt(a)).slice(0, 100);
+  console.log('Sorted keys:', sortedKeys)
+  const newRowsObj = {};
+  for (const key of sortedKeys) {
+    newRowsObj[key] = watcher.rows[key];
+  }
+  watcher.rows = newRowsObj;
+
   console.log('Watcher updated:', watcher.id);
   db.push(`/watchers/${watcher.id}`, watcher);
   return watcher;

@@ -14,6 +14,7 @@
     <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
     <script src="https://unpkg.com/lodash@4.17.14/lodash.min.js"></script>
     <script src="https://unpkg.com/axios@1.0.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mark.js@8.11.1/dist/mark.min.js"></script>
 
     <script>
       const VAPID_PUBLIC_KEY = '';
@@ -28,6 +29,24 @@
         max-height: 150px;
         overflow: hidden;
         opacity: 0.2;
+        position: relative;
+      }
+      .no-match-handler {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+      }
+      .bad-price {
+        color: red;
+      }
+      mark.not-match {
+        background-color: #ffaeae;
+      }
+      mark.match {
+        background-color: #bdffae;
       }
     </style>
   </head>
@@ -81,18 +100,23 @@
                 </v-card>
               </v-col>
             </v-row>
-            <v-row v-for="item in selectedWatcher.rows" :key="item.id" :class="{'item-match': item.match, 'item-not-match': !item.match}">
+            <v-row v-for="item in sortedSelectedRows" :key="item.id" :id="`item-${item.id}`" :class="{'item-match': item.match, 'item-not-match': !item.match}">
+              <div v-if="!item.match" @click="previewNonMatchItem(item)" class="no-match-handler"></div>
               <v-col cols="12">
                 <v-card>
                   <v-card-title>
-                    <a :href="item.url" target="_blank"><h3>{{ item.title }}</h3></a>
+                    <a v-if="item.match" :href="item.url" target="_blank"><h3>{{ item.title }}</h3></a>
+                    <h3 v-else>{{ item.title }}</h3>
                   </v-card-title>
                   <v-card-text>
                     <v-row>
-                      <v-col cols="3">
-                        <p>{{ item.price }} e</p>
+                      <v-col cols="2">
+                        <p :class="{'bad-price': badPrice(item)}">{{ item.price }} e</p>
                       </v-col>
-                      <v-col cols="9">
+                      <v-col cols="4">
+                        <p>{{ item.createdAt ? new Date(item.createdAt).toLocaleDateString('fi-FI') : '' }}</p>
+                      </v-col>
+                      <v-col cols="6">
                         <p>{{ item.location }}</p>
                       </v-col>
                     </v-row>
@@ -156,6 +180,11 @@
           selectedWatcher() {
             if (!this.selectedWatcherID) return null;
             return this.watchers[this.selectedWatcherID];
+          },
+          sortedSelectedRows() {
+            if (!this.selectedWatcher) return [];
+            // Sort by id reversed
+            return Object.values(this.selectedWatcher.rows).sort((a, b) => b.id - a.id);
           }
         },
 
@@ -166,6 +195,31 @@
         },
 
         methods: {
+          updateMark() {
+            this.$nextTick(() => {
+              if (!this.selectedWatcher) return;
+              for (const item of Object.values(this.selectedWatcher.rows)) {
+                const element = document.getElementById(`item-${item.id}`);
+                const instance = new Mark(element);
+                instance.unmark();
+                if (this.selectedWatcher.mustMatch) {
+                  instance.mark(this.selectedWatcher.mustMatch, {className: 'match'});
+                }
+                if (this.selectedWatcher.mustNotMatch) {
+                  instance.mark(this.selectedWatcher.mustNotMatch, {className: 'not-match'});
+                }
+              }
+            });
+          },
+          badPrice(item) {
+            const watcher = this.selectedWatcher;
+            if (watcher.minPrice && item.price < watcher.minPrice) return true;
+            if (watcher.maxPrice && item.price > watcher.maxPrice) return true;
+            return false;
+          },
+          previewNonMatchItem(item) {
+            this.$set(item, 'match', true);
+          },
           getAuthorization() {
             return window.localStorage.getItem('username') + ":" + window.localStorage.getItem('password');
           },
@@ -198,12 +252,14 @@
               username: window.localStorage.getItem('username'),
             });
             this.watchers.push(response.data);
+            this.updateMark();
           },
           async saveWatcher() {
             if (!this.selectedWatcher) return;
             const newData = await this.authPatch('/api/watchers/' + this.selectedWatcher.id, this.selectedWatcher);
             this.editingWatcher = false;
             this.$set(this.watchers, this.selectedWatcherID, newData.data);
+            this.updateMark();
           },
           async deleteWatcher() {
             if (!this.selectedWatcher) return;
@@ -216,6 +272,13 @@
             if (!this.selectedWatcher) return;
             const response = await this.authGet('/api/watchers/' + this.selectedWatcher.id);
             this.$set(this.watchers, this.selectedWatcherID, response.data);
+            this.updateMark();
+          }
+        },
+
+        watch: {
+          selectedWatcherID() {
+            this.updateMark();
           }
         }
       });
