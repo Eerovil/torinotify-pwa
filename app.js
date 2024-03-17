@@ -20,6 +20,11 @@ try {
 } catch (error) {
   await db.push("/subscriptions", []);
 }
+try {
+  await db.getData("/watchers");
+} catch (error) {
+  await db.push("/watchers", {});
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -69,6 +74,73 @@ app.post('/subscribe', async (req, res) => {
     return res.status(200).end();
   }
   db.push("/subscriptions[]", sub);
+  res.status(200).end();
+});
+
+async function getNewId(dbPath) {
+  const watchers = await db.getData(dbPath);
+  let maxId = 0;
+  for (const id in watchers) {
+    if (parseInt(id) > maxId) {
+      maxId = parseInt(id);
+    }
+  }
+  return maxId + 1;
+}
+
+app.post('/api/watchers', async (req, res) => {
+  if (!login(req.headers.authorization)) {
+    return res.status(401).end();
+  }
+  // Find max id and increment
+  const newId = await getNewId('/watchers');
+  await db.push(`/watchers/${newId}`, {id: newId, ...req.body});
+  // Return the new watcher
+  res.json(await db.getData(`/watchers/${newId}`));
+  res.status(200).end();
+});
+
+app.get('/api/watchers', async (req, res) => {
+  if (!login(req.headers.authorization)) {
+    return res.status(401).end();
+  }
+  const username = req.headers.authorization.split(':')[0];
+  const ret = {};
+  const allWatchers = await db.getData("/watchers");
+  for (const watcher of Object.values(allWatchers)) {
+    if (!watcher) {continue}
+    if (watcher.username == username) {
+      ret[watcher.id] = watcher;
+    }
+  }
+  res.json(ret);
+  res.status(200).end();
+});
+
+app.patch('/api/watchers/:id', async (req, res) => {
+  if (!login(req.headers.authorization)) {
+    return res.status(401).end();
+  }
+  const id = req.params.id;
+  const watcher = await db.getData(`/watchers/${id}`);
+  if (watcher.username != req.headers.authorization.split(':')[0]) {
+    return res.status(401).end();
+  }
+  db.push(`/watchers/${id}`, {...watcher, ...req.body});
+  res.json(await db.getData(`/watchers/${id}`));
+  res.status(200).end();
+});
+
+app.delete('/api/watchers/:id', async (req, res) => {
+  if (!login(req.headers.authorization)) {
+    return res.status(401).end();
+  }
+  const id = req.params.id;
+  const watcher = await db.getData(`/watchers/${id}`);
+  if (watcher.username != req.headers.authorization.split(':')[0]) {
+    return res.status(401).end();
+  }
+  db.delete(`/watchers/${id}`);
   res.status(200).end();
 });
 

@@ -29,12 +29,77 @@
           <v-toolbar dark color="primary" fixed>
             <h1>ToriNotify</h1>
             <v-spacer></v-spacer>
-            <v-btn icon>
-              <v-icon>mdi-menu</v-icon>
+            <v-btn v-if="!selectedWatcherID" icon @click="createWatcher">
+              <v-icon>mdi-plus</v-icon>
+            </v-btn>
+            <v-btn v-if="selectedWatcherID" icon @click="selectedWatcherID = null">
+              <v-icon>mdi-arrow-left</v-icon>
             </v-btn>
           </v-toolbar>
-          <v-container>
+          <v-container v-if="!selectedWatcherID">
+            <v-row v-for="watcher in watchers" :key="watcher.id" @click="selectedWatcherID = watcher.id">
+              <v-col cols="12">
+                <v-card>
+                  <v-card-title>
+                    <h3>{{ watcher.name || 'Tyhjä hakuvahti' }}</h3>
+                  </v-card-title>
+                  <v-card-text>
+                    <p>{{ watcher.url }}</p>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-container>
+          <v-container v-else-if="!editingWatcher">
             <v-row>
+              <v-col cols="12">
+                <v-card>
+                  <v-card-title>
+                    <h3>{{ selectedWatcher.name || 'Tyhjä hakuvahti' }}</h3>
+                    <v-spacer></v-spacer>
+                    <v-btn icon @click="editingWatcher = true">
+                      <v-icon>mdi-pencil</v-icon>
+                    </v-btn>
+                  </v-card-title>
+                  <v-card-text>
+                    <p>{{ selectedWatcher.url }}</p>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            <v-row v-for="item in selectedWatcher.items" :key="item.id">
+              <v-col cols="12">
+                <v-card>
+                  <v-card-title>
+                    <h2>{{ item.name }}</h2>
+                  </v-card-title>
+                  <v-card-text>
+                    <p>{{ item.url }}</p>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+          </v-container>
+          <v-container v-else>
+            <v-row>
+              <v-col cols="12">
+                <v-card>
+                  <v-card-title>
+                    <h3>Muokkaa hakuvahtia</h3>
+                    <v-spacer></v-spacer>
+                    <v-btn icon @click="editingWatcher = false">
+                      <v-icon>mdi-close</v-icon>
+                    </v-btn>
+                  </v-card-title>
+                  <v-card-text>
+                    <v-text-field label="Nimi" v-model="selectedWatcher.name"></v-text-field>
+                    <v-text-field label="URL" v-model="selectedWatcher.url"></v-text-field>
+                  </v-card-text>
+                  <v-card-actions>
+                    <v-btn @click="editingWatcher = false">Peruuta</v-btn>
+                    <v-btn color="error" @click="deleteWatcher">Poista</v-btn>
+                    <v-btn color="primary" @click="saveWatcher">Tallenna</v-btn>
+                  </v-card-actions>
+                </v-card>
+              </v-col>
             </v-row>
           </v-container>
         </v-main>
@@ -47,10 +112,24 @@
         vuetify: new Vuetify(),
 
         data: () => ({
-          subscription: null,
+          selectedWatcherID: null,
+          editingWatcher: false,
 
           watchers: {},
         }),
+
+        computed: {
+          selectedWatcher() {
+            if (!this.selectedWatcherID) return null;
+            return this.watchers[this.selectedWatcherID];
+          }
+        },
+
+        mounted() {
+          this.getWatchers().then(response => {
+            this.$set(this, 'watchers', response.data)
+          });
+        },
 
         methods: {
           getAuthorization() {
@@ -78,6 +157,26 @@
           },
           async getWatchers() {
             return this.authGet('/api/watchers');
+          },
+          async createWatcher() {
+            if (!confirm('Haluatko varmasti luoda uuden hakuvahtisi?')) return;
+            const response = await this.authPost('/api/watchers', {
+              username: window.localStorage.getItem('username'),
+            });
+            this.watchers.push(response.data);
+          },
+          async saveWatcher() {
+            if (!this.selectedWatcher) return;
+            const newData = await this.authPatch('/api/watchers/' + this.selectedWatcher.id, this.selectedWatcher);
+            this.editingWatcher = false;
+            this.$set(this.watchers, this.selectedWatcherID, newData.data);
+          },
+          async deleteWatcher() {
+            if (!this.selectedWatcher) return;
+            if (!confirm('Haluatko varmasti poistaa hakuvahtisi?')) return;
+            await this.authDelete('/api/watchers/' + this.selectedWatcher.id);
+            this.$delete(this.watchers, this.selectedWatcherID);
+            this.selectedWatcherID = null;
           },
         }
       });
