@@ -213,12 +213,13 @@ function parseRow(rowElement) {
   const id = ret.url.split('/').filter(Boolean).pop()
   Object.assign(ret, {id});
   const imgEl = rowElement.querySelector('img');
+  const date = (rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text;
   Object.assign(ret, {
     thumbnail: imgEl ? imgEl.getAttribute('src') : '',
     title: rowElement.querySelector('h2').text,
     price: parsePrice(rowElement.querySelector('.whitespace-nowrap').text),
     location: (rowElement.querySelector('.s-text-subtle span:nth-child(3)') || {}).text,
-    date: (rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text,
+    createdAt: date ? new Date(date) : new Date(),
   });
   return ret;
 }
@@ -280,7 +281,7 @@ async function updateWatcher(watcher) {
   for (const row of newRows) {
     try {
       let match = true;
-      const {id, url, thumbnail, title, price, location} = parseRow(row);
+      const {id, url, thumbnail, title, price, location, createdAt} = parseRow(row);
       const oldData = watcher.rows[id] || {};
       const isNew = !rowsEmpty && !oldData.url;
       if (price < minPrice || price > maxPrice) {
@@ -304,16 +305,15 @@ async function updateWatcher(watcher) {
       if (isNew && match) {
         pushNotification(watcher.username, `${title} - ${price}€`);
       }
-      if (!watcher.rows[id].createdAt) {
-        watcher.rows[id].createdAt = new Date().toISOString();
-      }
     } catch (error) {
       console.log('Error parsing row:', error);
     }
   }
-  // Sort rows by id reversed (newest first) NOTE It's an object
+  // Sort rows by date reversed (newest first) NOTE It's an object
   // Max amount of rows is 100
-  const sortedKeys = Object.keys(watcher.rows).sort((a, b) => parseInt(b) - parseInt(a)).slice(0, 100);
+  const sortedKeys = Object.keys(watcher.rows).sort((a, b) => {
+    return watcher.rows[b].createdAt - watcher.rows[a].createdAt;
+  }).slice(0, 100);
   console.log('Sorted keys:', sortedKeys)
   const newRowsObj = {};
   for (const key of sortedKeys) {
