@@ -319,7 +319,7 @@ async function updateWatcher(watcher) {
   // Sort rows by id reversed (newest first) NOTE It's an object
   // Max amount of rows is 100
   const sortedKeys = Object.keys(watcher.rows).sort((a, b) => {
-    return parseInt(b) - parseInt(a);
+    return parseInt(a) - parseInt(b);
   }).slice(0, 100);
   console.log('Sorted keys:', sortedKeys)
   const newRowsObj = {};
