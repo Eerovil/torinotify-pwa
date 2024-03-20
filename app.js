@@ -7,6 +7,7 @@ import secrets from './secrets.js';
 import { JsonDB, Config } from 'node-json-db';
 import { parse } from 'node-html-parser';
 import axios from 'axios';
+import https from 'https';
 
 var db = new JsonDB(new Config("db", true, true, '/'));
 let users;
@@ -189,68 +190,66 @@ function parsePrice(priceText) {
 async function parseItem(itemUrl) {
   // Get description and location
   const response = await axiosGetPage(itemUrl);
+  if (!response) {
+    return {description: '', location: ''};
+  }
   const html = await response.data;
   const root = parse(html);
-  const beta = !root.querySelector('#beta');
   const ret = {
     description: root.querySelector('meta[name="description"]').getAttribute('content'),
-    location: '',
   };
-  if (beta) {
-    const view = root.querySelector('div.nohistory.private');
-    if (view) {
-      // Split by newlines
-      const lines = view.text.split('\n').filter((line) => line.trim() != '');
-      const lastLine = lines[lines.length - 1];
-      ret['location'] = lastLine;
-    }
-    const itemPropDescription = root.querySelector('div[itemprop="description"]');
-    if (itemPropDescription) {
-      ret['description'] = (itemPropDescription.text || '').trim();
-    }
-  } else {
-    const description = root.querySelector('#body');
-    ret['location'] = '';
+  const itemPropDescription = root.querySelector('.about-section');
+  if (itemPropDescription) {
+    ret['description'] = (itemPropDescription.text || '').trim();
   }
   return ret;
 }
 
-function parseRow(rowElement, beta = false) {
+function parseRow(rowElement) {
+  console.log('Parsing row', rowElement.text);
   const ret = {
-    url: rowElement.getAttribute('href'),
+    url: rowElement.querySelector('a').getAttribute('href'),
   };
-  // Id is in URL: "xxxxxx.htm" where xxxxxx is the id in digits
-  const id = ret.url.match(/(\d+).htm/)[1];
+  const id = ret.url.split('/').filter(Boolean).pop()
   Object.assign(ret, {id});
-  if (beta) {
-    Object.assign(ret, {
-      thumbnail: rowElement.querySelector('img').getAttribute('src'),
-      title: rowElement.querySelector('.li-title').text,
-      price: parsePrice(rowElement.querySelector('.list_price').text),
-    });
-    return ret;
-  }
+  const imgEl = rowElement.querySelector('img');
   Object.assign(ret, {
-    thumbnail: rowElement.querySelector('img.thumb').getAttribute('src'),
-    title: rowElement.querySelector('.listing-row-title').text,
-    price: parsePrice(rowElement.querySelector('.row-price').text),
+    thumbnail: imgEl ? imgEl.getAttribute('src') : '',
+    title: rowElement.querySelector('h2').text,
+    price: parsePrice(rowElement.querySelector('.whitespace-nowrap').text),
+    location: (rowElement.querySelector('.s-text-subtle span:nth-child(3)') || {}).text,
+    date: (rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text,
   });
   return ret;
 }
 
 async function axiosGetPage(url) {
+  
+  const agent = new https.Agent({  
+    rejectUnauthorized: false
+  });
   return await axios.get(url, {
-    responseEncoding: "latin1",
+    // httpsAgent: agent,
+    referrerPolicy: "strict-origin-when-cross-origin",
     headers: {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Cache-Control': 'max-age=0',
-      'Connection': 'keep-alive',
-      'Host': 'www.tori.fi',
-      'Upgrade-Insecure-Requests': '1',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+      'accept-encoding': 'gzip, deflate, br',
+      'accept-language': 'en-US,en;q=0.9',
+      'cache-control': 'no-cache',
+      'pragma': 'no-cache',
+      'sec-ch-ua': '"Chromium";v="94", "Google Chrome";v="94", ";Not A Brand";v="99"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"macOS"',
+      'sec-fetch-dest': 'document',
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'none',
+      'sec-fetch-user': '?1',
+      'upgrade-insecure-requests': '1',
+      'cookie': '_sp_su=false; _cmp_marketing=1; _cmp_advertising=1; _cmp_analytics=1; _cmp_personalisation=1; toricmp_store_data=1; toricmp_marketing=1; toricmp_analytics=1; toricmp_personalisation=1; toricmp_purpose3=1; toricmp_purpose4=1; toricmp_purpose6=1; toricmp_vendor_braze=1; toricmp_vendor_pulse=1; toricmp_vendor_hotjar=1; toricmp_vendor_abtasty=1; toricmp_vendor_facebook=1; toricmp_vendor_gar=1; XPD-DECISION=aurora; _pulse2data=%2Cv%2C%2C1710938335628%2C%2C%2C0%2C%2C%2C; bucket=%5B%7B%22name%22%3A%22searchResultLayout%22%2C%22value%22%3A%22grid%22%7D%2C%7B%22name%22%3A%22locationSearchParams%22%2C%22value%22%3A%7B%7D%7D%5D; _pulsesession=%5B%22sdrn%3Aschibsted%3Asession%3A70558bea-c592-435c-b4a0-9d352f35bc0b%22%2C1710937435644%2C1710937461363%5D',
     }
+  }).catch(err => {
+    console.log('Error fetching page:', url, err);
+    return null;
   });
 }
 
@@ -261,20 +260,17 @@ async function updateWatcher(watcher) {
   if (!url) {
     return watcher;
   }
-  if (!(url.includes('https://m.tori'))) {
-    return watcher;
+  if (url.includes('m.tori.fi')) {
+    return watcher
   }
   console.log('Fetching:', url);
   const response = await axiosGetPage(url);
+  if (!response) {
+    return watcher;
+  }
   const html = await response.data;
   const root = parse(html);
-  let newRows = root.querySelectorAll('.row-href');
-  let beta = false;
-  if (newRows.length == 0) {
-    console.debug('No rows found using old, using beta mode');
-    beta = true;
-    newRows = root.querySelectorAll('.item_row_flex');
-  }
+  let newRows = root.querySelectorAll('article');
   const minPrice = watcher.minPrice || 0;
   const maxPrice = watcher.maxPrice || 1000000;
   const mustMatch = watcher.mustMatch || null;
@@ -284,17 +280,16 @@ async function updateWatcher(watcher) {
   for (const row of newRows) {
     try {
       let match = true;
-      const {id, url, thumbnail, title, price} = parseRow(row, beta);
+      const {id, url, thumbnail, title, price, location} = parseRow(row);
       const oldData = watcher.rows[id] || {};
       const isNew = !rowsEmpty && !oldData.url;
       if (price < minPrice || price > maxPrice) {
         match = false;
       }
-      watcher.rows[id] = {...oldData, id, url, thumbnail, title, price};
+      watcher.rows[id] = {...oldData, id, url, thumbnail, title, price, location};
       if (match && !oldData.description) {
-        const {description, location} = await parseItem(url);
+        const {description} = await parseItem(url);
         watcher.rows[id].description = description;
-        watcher.rows[id].location = location;
       }
       if (match) {
         const fullText = `${title} ${watcher.rows[id].description || ''} ${watcher.rows[id].location || ''}`;
