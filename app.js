@@ -309,10 +309,17 @@ async function updateWatcher(watcher) {
       console.log('Error parsing row:', error);
     }
   }
-  // Sort rows by date reversed (newest first) NOTE It's an object
+  // Remove old rows that have "images.tori" in thumbnail
+  for (const id in watcher.rows) {
+    if (watcher.rows[id].thumbnail.includes('images.tori')) {
+      delete watcher.rows[id];
+    }
+  }
+
+  // Sort rows by id reversed (newest first) NOTE It's an object
   // Max amount of rows is 100
   const sortedKeys = Object.keys(watcher.rows).sort((a, b) => {
-    return watcher.rows[b].createdAt - watcher.rows[a].createdAt;
+    return parseInt(b) - parseInt(a);
   }).slice(0, 100);
   console.log('Sorted keys:', sortedKeys)
   const newRowsObj = {};
