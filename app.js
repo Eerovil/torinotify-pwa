@@ -198,7 +198,7 @@ async function parseItem(itemUrl) {
   const ret = {
     description: root.querySelector('meta[name="description"]').getAttribute('content'),
   };
-  const itemPropDescription = root.querySelector('.about-section');
+  const itemPropDescription = root.querySelector('.about-section .whitespace-pre-wrap');
   if (itemPropDescription) {
     ret['description'] = (itemPropDescription.text || '').trim();
   }
