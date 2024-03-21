@@ -216,7 +216,10 @@ function parseRow(rowElement) {
   const date = ((rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text || '').trim();
   let parsedDate;
   try {
-    parsedDate = new Date(date);
+    if (date.includes('.')) {
+      const [day, month, year] = date.split('.');
+      parsedDate = new Date(`${year}-${month}-${day}`);
+    }
     if (isNaN(parsedDate)) {
       parsedDate = new Date();
     }
