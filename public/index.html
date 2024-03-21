@@ -180,8 +180,8 @@
           },
           sortedSelectedRows() {
             if (!this.selectedWatcher) return [];
-            // Sort by id reversed
-            return Object.values(this.selectedWatcher.rows).sort((a, b) => b.id - a.id);
+            // Sort by createdAt date reversed
+            return Object.values(this.selectedWatcher.rows).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           }
         },
 

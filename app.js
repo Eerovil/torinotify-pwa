@@ -213,13 +213,24 @@ function parseRow(rowElement) {
   const id = ret.url.split('/').filter(Boolean).pop()
   Object.assign(ret, {id});
   const imgEl = rowElement.querySelector('img');
-  const date = (rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text;
+  const date = ((rowElement.querySelector('.s-text-subtle span:nth-child(1)') || {}).text || '').trim();
+  let parsedDate;
+  try {
+    parsedDate = new Date(date);
+    if (isNaN(parsedDate)) {
+      parsedDate = new Date();
+    }
+  } catch (error) {
+    console.log('Error parsing date:', date);
+    parsedDate = new Date();
+  }
+  console.log('Parsed date:', parsedDate)
   Object.assign(ret, {
     thumbnail: imgEl ? imgEl.getAttribute('src') : '',
     title: rowElement.querySelector('h2').text,
     price: parsePrice(rowElement.querySelector('.whitespace-nowrap').text),
     location: (rowElement.querySelector('.s-text-subtle span:nth-child(3)') || {}).text,
-    createdAt: date ? new Date(date) : new Date(),
+    createdAt: parsedDate,
   });
   return ret;
 }
@@ -304,6 +315,9 @@ async function updateWatcher(watcher) {
       watcher.rows[id].match = match;
       if (isNew && match) {
         pushNotification(watcher.username, `${title} - ${price}€`);
+      }
+      if (!watcher.rows[id].createdAt) {
+        watcher.rows[id].createdAt = createdAt;
       }
     } catch (error) {
       console.log('Error parsing row:', error);
