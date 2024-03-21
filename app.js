@@ -319,7 +319,7 @@ async function updateWatcher(watcher) {
       if (isNew && match) {
         pushNotification(watcher.username, `${title} - ${price}€`);
       }
-      if (!watcher.rows[id].createdAt) {
+      if (!watcher.rows[id].createdAt || watcher.rows[id].createdAt > new Date()) {
         watcher.rows[id].createdAt = createdAt;
       }
     } catch (error) {
