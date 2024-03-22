@@ -180,8 +180,21 @@
           },
           sortedSelectedRows() {
             if (!this.selectedWatcher) return [];
+            const sortFunc = (a, b) => {
+              const dateA = new Date(a.createdAt);
+              const dateB = new Date(b.createdAt);
+              const dateDiffSeconds = (dateA - dateB) / 1000;
+              if (dateDiffSeconds < -1000) return 1;
+              if (dateDiffSeconds > 1000) return -1;
+              return parseInt(b.id) - parseInt(a.id);
+            };
             // Sort by createdAt date reversed
-            return Object.values(this.selectedWatcher.rows).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const sorted = [];
+            for (row of Object.values(this.selectedWatcher.rows).sort(sortFunc)) {
+              sorted.push(row);
+            }
+            console.log(sorted.map(row => `${row.createdAt} ${row.id}`))
+            return sorted;
           }
         },
 
