@@ -23,7 +23,7 @@
       }
       .item-not-match {
         background-color: #ffaeae;
-        max-height: 150px;
+        max-height: 100px;
         overflow: hidden;
         opacity: 0.2;
         position: relative;
@@ -103,12 +103,13 @@
                 <v-card>
                   <v-card-title>
                     <a v-if="item.match" :href="item.url" target="_blank"><h3>{{ item.title }}</h3></a>
-                    <h3 v-else>{{ item.title }}</h3>
+                    <h4 v-else style="display: flex;">
+                      <img :src="item.thumbnail" style="max-width: 20%; max-height: 100px; margin-right: 1rem;">{{ item.price }}€ {{ item.title }}</h4>
                   </v-card-title>
                   <v-card-text>
                     <v-row>
                       <v-col cols="2">
-                        <p :class="{'bad-price': badPrice(item)}">{{ item.price }} e</p>
+                        <p :class="{'bad-price': badPrice(item)}">{{ item.price }}€</p>
                       </v-col>
                       <v-col cols="4">
                         <p>{{ item.createdAt ? new Date(item.createdAt).toLocaleDateString('fi-FI') : '' }}</p>
